@@ -1,10 +1,10 @@
 package org.mockito.internal
 
-import org.mockito.internal.MacroDebug.debugResult
-
 import scala.reflect.ClassTag
-import scala.reflect.macros.blackbox
 
+/**
+ * Runtime support for wrapping values into value classes. Shared across Scala 2 and Scala 3.
+ */
 trait ValueClassWrapper[VC] extends Serializable {
   def isValueClass: Boolean = true
   def wrap(vc: VC): Any
@@ -27,25 +27,6 @@ class ReflectionWrapper[VC: ClassTag] extends ValueClassWrapper[VC] {
       .getOrElse(throw new RuntimeException(s"Can't find a constructor for $clazz that takes a single param"))
 }
 
-object ValueClassWrapper {
+object ValueClassWrapper extends ValueClassWrapperCompat {
   def apply[T: ValueClassWrapper]: ValueClassWrapper[T] = implicitly[ValueClassWrapper[T]]
-
-  implicit def instance[VC]: ValueClassWrapper[VC] = macro materialise[VC]
-
-  def materialise[VC: c.WeakTypeTag](c: blackbox.Context): c.Expr[ValueClassWrapper[VC]] = {
-    import c.universe.*
-    val tpe          = weakTypeOf[VC]
-    val typeSymbol   = tpe.typeSymbol
-    val isValueClass = typeSymbol.isClass && typeSymbol.asClass.isDerivedValueClass
-
-    val r =
-      if (isValueClass)
-        c.Expr[ValueClassWrapper[VC]](q"new _root_.org.mockito.internal.ReflectionWrapper[$tpe]")
-      else
-        c.Expr[ValueClassWrapper[VC]](q"new _root_.org.mockito.internal.NormalClassWrapper[$tpe]")
-
-    debugResult(c)("mockito-print-wrapper")(r.tree)
-
-    r
-  }
 }

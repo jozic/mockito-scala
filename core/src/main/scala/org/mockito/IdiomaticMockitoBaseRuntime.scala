@@ -5,21 +5,48 @@ import org.mockito.verification.VerificationMode
 
 import scala.concurrent.duration.Duration
 
-object IdiomaticMockitoBase {
+/**
+ * Runtime support for IdiomaticMockitoBase. Shared across Scala 2 and Scala 3. Macro-based operations are in version-specific IdiomaticMockitoBase. This trait can be extended by
+ * objects that need to provide these runtime members (like the scala-2 IdiomaticMockitoBase object).
+ */
+trait IdiomaticMockitoBaseRuntime {
+  // Re-export singleton objects from companion object
+  val Returned: IdiomaticMockitoBaseRuntime.Returned.type = IdiomaticMockitoBaseRuntime.Returned
+  val Answered: IdiomaticMockitoBaseRuntime.Answered.type = IdiomaticMockitoBaseRuntime.Answered
+  val Thrown: IdiomaticMockitoBaseRuntime.Thrown.type     = IdiomaticMockitoBaseRuntime.Thrown
+  val On: IdiomaticMockitoBaseRuntime.On.type             = IdiomaticMockitoBaseRuntime.On
+  val Never: IdiomaticMockitoBaseRuntime.Never.type       = IdiomaticMockitoBaseRuntime.Never
+  type CalledAgain = IdiomaticMockitoBaseRuntime.CalledAgain
+  val CalledAgain: IdiomaticMockitoBaseRuntime.CalledAgain.type               = IdiomaticMockitoBaseRuntime.CalledAgain
+  val LenientCalledAgain: IdiomaticMockitoBaseRuntime.LenientCalledAgain.type = IdiomaticMockitoBaseRuntime.LenientCalledAgain
+  val IgnoringStubs: IdiomaticMockitoBaseRuntime.IgnoringStubs.type           = IdiomaticMockitoBaseRuntime.IgnoringStubs
+  type Times = IdiomaticMockitoBaseRuntime.Times
+  val Times: IdiomaticMockitoBaseRuntime.Times.type = IdiomaticMockitoBaseRuntime.Times
+  type AtLeast = IdiomaticMockitoBaseRuntime.AtLeast
+  val AtLeast: IdiomaticMockitoBaseRuntime.AtLeast.type = IdiomaticMockitoBaseRuntime.AtLeast
+  type AtMost = IdiomaticMockitoBaseRuntime.AtMost
+  val AtMost: IdiomaticMockitoBaseRuntime.AtMost.type = IdiomaticMockitoBaseRuntime.AtMost
+  val OnlyOn: IdiomaticMockitoBaseRuntime.OnlyOn.type = IdiomaticMockitoBaseRuntime.OnlyOn
+  type ReturnActions[T] = IdiomaticMockitoBaseRuntime.ReturnActions[T]
+  type ThrowActions[T]  = IdiomaticMockitoBaseRuntime.ThrowActions[T]
+  val CallWord: IdiomaticMockitoBaseRuntime.CallWord.type   = IdiomaticMockitoBaseRuntime.CallWord
+  val CallsWord: IdiomaticMockitoBaseRuntime.CallsWord.type = IdiomaticMockitoBaseRuntime.CallsWord
+  def Exactly(times: Int): Times                            = IdiomaticMockitoBaseRuntime.Exactly(times)
+  val AtLeastOne: AtLeast                                   = IdiomaticMockitoBaseRuntime.AtLeastOne
+  val AtLeastTwo: AtLeast                                   = IdiomaticMockitoBaseRuntime.AtLeastTwo
+  val AtLeastThree: AtLeast                                 = IdiomaticMockitoBaseRuntime.AtLeastThree
+  val AtMostOne: AtMost                                     = IdiomaticMockitoBaseRuntime.AtMostOne
+  val AtMostTwo: AtMost                                     = IdiomaticMockitoBaseRuntime.AtMostTwo
+  val AtMostThree: AtMost                                   = IdiomaticMockitoBaseRuntime.AtMostThree
+}
+
+/**
+ * Companion object containing the actual singleton runtime objects and classes.
+ */
+object IdiomaticMockitoBaseRuntime {
   object Returned
-  case class ReturnedBy[T]() {
-    def by[S](stubbing: S)(implicit $ev: T <:< S): S = macro DoSomethingMacro.returnedBy[T, S]
-  }
-
   object Answered
-  case class AnsweredBy[T]() {
-    def by[S](stubbing: S)(implicit $ev: T <:< S): S = macro DoSomethingMacro.answeredBy[T, S]
-  }
-
   object Thrown
-  class ThrownBy[E] {
-    def by[T](stubbing: T)(implicit $ev: E <:< Throwable): T = macro DoSomethingMacro.thrownBy[T]
-  }
 
   object On
   object Never
@@ -88,7 +115,7 @@ object IdiomaticMockitoBase {
   }
 
   class ThrowActions[T](os: ScalaFirstStubbing[T]) {
-    def apply[E <: Throwable](e: E*): ScalaOngoingStubbing[T] = os thenThrow (e*)
+    def apply[E <: Throwable](e: E*): ScalaOngoingStubbing[T] = os.thenThrow(e*)
   }
 
   // types for postfix verifications
@@ -99,5 +126,3 @@ object IdiomaticMockitoBase {
     def apply(ignoringStubsWord: IgnoringStubs.type): CallsWord.type = this
   }
 }
-
-trait IdiomaticMockitoBase extends IdiomaticStubbing with PostfixVerifications

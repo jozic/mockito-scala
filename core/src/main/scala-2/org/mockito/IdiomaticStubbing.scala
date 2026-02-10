@@ -3,8 +3,13 @@ package org.mockito
 import org.mockito.WhenMacro.*
 import org.mockito.stubbing.ScalaOngoingStubbing
 
-trait IdiomaticStubbing extends MockitoEnhancer with ScalacticSerialisableHack {
+/**
+ * Scala 2 version of IdiomaticStubbing with macro-based stubbing operations.
+ */
+trait IdiomaticStubbing extends IdiomaticStubbingRuntime {
   import org.mockito.IdiomaticMockitoBase.*
+
+  val called: Called.type = Called
 
   implicit class StubbingOps[T](stubbing: T) {
     def shouldReturn: ReturnActions[T] = macro WhenMacro.shouldReturn[T]
@@ -35,14 +40,6 @@ trait IdiomaticStubbing extends MockitoEnhancer with ScalacticSerialisableHack {
     def doesNothing(): Unit = macro DoSomethingMacro.doesNothing
   }
 
-  val called: Called.type            = Called
-  val thrown: Thrown.type            = Thrown
-  val returned: Returned.type        = Returned
-  val answered: Answered.type        = Answered
-  val theRealMethod: RealMethod.type = RealMethod
-
-  val realMethod: RealMethod.type = RealMethod
-
   implicit class DoSomethingOps[R](v: R) {
     def willBe(r: Returned.type): ReturnedBy[R] = ReturnedBy[R]()
     def willBe(a: Answered.type): AnsweredBy[R] = AnsweredBy[R]()
@@ -51,33 +48,43 @@ trait IdiomaticStubbing extends MockitoEnhancer with ScalacticSerialisableHack {
   implicit class DoSomethingOps0[R](v: () => R) {
     def willBe(a: Answered.type): AnsweredBy[R] = AnsweredBy[R]()
   }
+
   implicit class DoSomethingOps1[P0, R](v: P0 => R) {
     def willBe(a: Answered.type): AnsweredBy[R] = AnsweredBy[R]()
   }
+
   implicit class DoSomethingOps2[P0, P1, R](v: (P0, P1) => R) {
     def willBe(a: Answered.type): AnsweredBy[R] = AnsweredBy[R]()
   }
+
   implicit class DoSomethingOps3[P0, P1, P2, R](v: (P0, P1, P2) => R) {
     def willBe(a: Answered.type): AnsweredBy[R] = AnsweredBy[R]()
   }
+
   implicit class DoSomethingOps4[P0, P1, P2, P3, R](v: (P0, P1, P2, P3) => R) {
     def willBe(a: Answered.type): AnsweredBy[R] = AnsweredBy[R]()
   }
+
   implicit class DoSomethingOps5[P0, P1, P2, P3, P4, R](v: (P0, P1, P2, P3, P4) => R) {
     def willBe(a: Answered.type): AnsweredBy[R] = AnsweredBy[R]()
   }
+
   implicit class DoSomethingOps6[P0, P1, P2, P3, P4, P5, R](v: (P0, P1, P2, P3, P4, P5) => R) {
     def willBe(a: Answered.type): AnsweredBy[R] = AnsweredBy[R]()
   }
+
   implicit class DoSomethingOps7[P0, P1, P2, P3, P4, P5, P6, R](v: (P0, P1, P2, P3, P4, P5, P6) => R) {
     def willBe(a: Answered.type): AnsweredBy[R] = AnsweredBy[R]()
   }
+
   implicit class DoSomethingOps8[P0, P1, P2, P3, P4, P5, P6, P7, R](v: (P0, P1, P2, P3, P4, P5, P6, P7) => R) {
     def willBe(a: Answered.type): AnsweredBy[R] = AnsweredBy[R]()
   }
+
   implicit class DoSomethingOps9[P0, P1, P2, P3, P4, P5, P6, P7, P8, R](v: (P0, P1, P2, P3, P4, P5, P6, P7, P8) => R) {
     def willBe(a: Answered.type): AnsweredBy[R] = AnsweredBy[R]()
   }
+
   implicit class DoSomethingOps10[P0, P1, P2, P3, P4, P5, P6, P7, P8, P9, R](v: (P0, P1, P2, P3, P4, P5, P6, P7, P8, P9) => R) {
     def willBe(a: Answered.type): AnsweredBy[R] = AnsweredBy[R]()
   }

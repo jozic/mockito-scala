@@ -2,16 +2,22 @@ package org.mockito
 
 import org.mockito.Utils.*
 import org.mockito.internal.MacroDebug.debugResult
-import org.mockito.internal.verification.VerificationModeFactory
-import org.mockito.verification.VerificationMode
 
 import scala.reflect.macros.blackbox
 
+/**
+ * Scala 2 macro implementations for the idiomatic verification DSL. Runtime support classes are in VerifyMacroRuntime.
+ */
 object Called {
   def by[T](stubbing: T): T = macro DoSomethingMacro.calledBy[T]
 }
 
 object VerifyMacro extends VerificationMacroTransformer {
+  // Re-export runtime objects for backward compatibility
+  val Never      = VerifyMacroRuntime.Never
+  val NeverAgain = VerifyMacroRuntime.NeverAgain
+  val Once       = VerifyMacroRuntime.Once
+
   def wasMacro[T: c.WeakTypeTag, R](c: blackbox.Context)(called: c.Tree)(order: c.Expr[VerifyOrder]): c.Expr[R] = {
     val r = c.Expr[R](transformVerification(c)(c.macroApplication))
     debugResult(c)("mockito-print-verify")(r.tree)
@@ -23,19 +29,6 @@ object VerifyMacro extends VerificationMacroTransformer {
     debugResult(c)("mockito-print-verify")(r.tree)
     r
   }
-
-  object Never extends ScalaVerificationMode {
-    override def verificationMode: VerificationMode = Mockito.never
-  }
-
-  object NeverAgain extends ScalaVerificationMode {
-    override def verificationMode: VerificationMode = VerificationModeFactory.noMoreInteractions()
-  }
-
-  object Once extends ScalaVerificationMode {
-    override def verificationMode: VerificationMode = Mockito.times(1)
-  }
-
 }
 
 private[mockito] trait VerificationMacroTransformer {
@@ -100,7 +93,7 @@ private[mockito] trait VerificationMacroTransformer {
 
     called match {
       case q"$_.VerifyingOps[$_]($invocation).was($_.called)($order)" =>
-        transformInvocation(c)(invocation, order, q"_root_.org.mockito.VerifyMacro.Once")
+        transformInvocation(c)(invocation, order, q"_root_.org.mockito.VerifyMacroRuntime.Once")
 
       case q"$_.VerifyingOps[$_]($a.$b).wasNever($called)($order)" =>
         q"""
@@ -115,15 +108,15 @@ private[mockito] trait VerificationMacroTransformer {
                 ""
               ).mkString("\n"))
              """
-            case _ => transformInvocation(c)(q"$a.$b", order, q"_root_.org.mockito.VerifyMacro.Never")
+            case _ => transformInvocation(c)(q"$a.$b", order, q"_root_.org.mockito.VerifyMacroRuntime.Never")
           }}
-          } else { 
+          } else {
             ${transformMockWasNeverCalled(q"$a.$b", called)}
           }
          """
 
       case q"$_.VerifyingOps[$_]($obj.$method[..$targs](...$args)).wasNever($_.called)($order)" =>
-        transformInvocation(c)(q"$obj.$method[..$targs](...$args)", order, q"_root_.org.mockito.VerifyMacro.Never")
+        transformInvocation(c)(q"$obj.$method[..$targs](...$args)", order, q"_root_.org.mockito.VerifyMacroRuntime.Never")
 
       case q"$_.VerifyingOps[$_]($obj).wasNever($called)($_)" =>
         transformMockWasNeverCalled(obj, called)
@@ -134,30 +127,4 @@ private[mockito] trait VerificationMacroTransformer {
       case o => throw new Exception(s"VerifyMacro: Couldn't recognize ${show(o)}")
     }
   }
-}
-
-trait ScalaVerificationMode {
-  def verificationMode: VerificationMode
-}
-
-sealed trait VerifyOrder {
-  def verify[T](mock: T): T
-  def verifyWithMode[T](mock: T, mode: ScalaVerificationMode): T
-}
-
-object VerifyUnOrdered extends VerifyOrder {
-  override def verify[T](mock: T): T                                      = Mockito.verify(mock)
-  override def verifyWithMode[T](mock: T, mode: ScalaVerificationMode): T = Mockito.verify(mock, mode.verificationMode)
-}
-
-case class VerifyInOrder(mocks: Seq[AnyRef]) extends VerifyOrder {
-  private val _inOrder = Mockito.inOrder(mocks*)
-
-  override def verify[T](mock: T): T                                      = _inOrder.verify(mock)
-  override def verifyWithMode[T](mock: T, mode: ScalaVerificationMode): T = _inOrder.verify(mock, mode.verificationMode)
-  def verifyNoMoreInteractions(): Unit                                    = _inOrder.verifyNoMoreInteractions()
-}
-
-object VerifyOrder {
-  implicit val unOrdered: VerifyOrder = VerifyUnOrdered
 }

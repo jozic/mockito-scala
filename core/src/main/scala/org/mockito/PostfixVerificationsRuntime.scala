@@ -1,27 +1,11 @@
 package org.mockito
 
-trait IdiomaticVerifications {
+/**
+ * Runtime support for PostfixVerifications. Shared across Scala 2 and Scala 3. Macro-based verification operations are in version-specific PostfixVerifications.
+ */
+trait PostfixVerificationsRuntime extends IdiomaticVerifications {
 
-  type Verification
-
-  def verification(v: => Any): Verification
-
-}
-
-trait PostfixVerifications extends IdiomaticVerifications {
-
-  import org.mockito.IdiomaticMockitoBase.*
-
-  implicit class VerifyingOps[T](stubbing: T) {
-    def was(called: Called.type)(implicit order: VerifyOrder): Verification = macro VerifyMacro.wasMacro[T, Verification]
-
-    def wasNever(called: Called.type)(implicit order: VerifyOrder): Verification = macro VerifyMacro.wasMacro[T, Verification]
-
-    def wasNever(called: CalledAgain)(implicit $ev: T <:< AnyRef): Verification =
-      macro VerifyMacro.wasNeverCalledAgainMacro[T, Verification]
-
-    def wasCalled(called: ScalaVerificationMode)(implicit order: VerifyOrder): Verification = macro VerifyMacro.wasMacro[T, Verification]
-  }
+  import org.mockito.IdiomaticMockitoBaseRuntime.*
 
   val calledAgain: CalledAgain.type     = CalledAgain
   val ignoringStubs: IgnoringStubs.type = IgnoringStubs
@@ -61,8 +45,6 @@ trait PostfixVerifications extends IdiomaticVerifications {
   val atMostEightTimes: AtMost   = AtMost(8)
   val atMostNineTimes: AtMost    = AtMost(9)
   val atMostTenTimes: AtMost     = AtMost(10)
-
-  def InOrder(mocks: AnyRef*)(verifications: VerifyInOrder => Verification): Verification = verifications(VerifyInOrder(mocks))
 
   def atLeast(t: Times): AtLeast = AtLeast(t.times)
   def atMost(t: Times): AtMost   = AtMost(t.times)
