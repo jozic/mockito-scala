@@ -14,6 +14,10 @@ trait PrefixExpectationsRuntime extends IdiomaticVerifications {
 
   val ignoringStubs: IgnoringStubs.type = IgnoringStubs
 
+  class ExpectationOpsBase(val mode: ScalaVerificationMode)
+
+  trait ExpectationOpsNoUsages
+
   implicit class IntOps(i: Int) {
     def calls: Calls = Times(i)
     def call: Calls  = Times(i)
