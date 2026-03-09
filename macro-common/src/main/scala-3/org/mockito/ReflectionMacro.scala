@@ -9,15 +9,15 @@ import scala.reflect.ClassTag
  */
 object ReflectionMacro {
 
-  inline def registerByNameAndVarArgInfo[T](): Unit = ${ registerImpl[T] }
+  inline def registerByNameAndVarArgInfo[T](using classTag: ClassTag[T]): Unit = ${ registerImpl[T]('classTag) }
 
-  def registerImpl[T: Type](using Quotes): Expr[Unit] = {
+  def registerImpl[T: Type](classTagExpr: Expr[ClassTag[T]])(using Quotes): Expr[Unit] = {
     import quotes.reflect.*
 
     val tpe        = TypeRepr.of[T].dealias
     val typeSymbol = tpe.typeSymbol
 
-    case class MethodInfo(name: String, jvmParamTypes: List[Expr[Class[?]]], byNameOrVarArgIndices: Set[Int])
+    case class MethodInfo(name: String, jvmParamTypes: List[Expr[Class[?]]], byNameOrVarArgIndices: Set[Int], returnsValueClass: Boolean)
 
     // Use memberType to get the method type with proper type parameter resolution
     // Include inherited methods by walking base classes
@@ -27,9 +27,9 @@ object ReflectionMacro {
         .filter(s => s.isDefDef && !s.isClassConstructor && seen.add(s.fullName))
     }
 
-    val methodInfos = allMethods.flatMap { sym =>
-      val methodType   = tpe.memberType(sym)
-      val isJavaMethod = sym.flags.is(Flags.JavaDefined)
+    val methodInfos = allMethods.flatMap { methodSym =>
+      val methodType   = tpe.memberType(methodSym)
+      val isJavaMethod = methodSym.flags.is(Flags.JavaDefined)
 
       def collectParams(tpe: TypeRepr, baseIdx: Int): List[(TypeRepr, Int, Boolean, Boolean)] =
         tpe match {
@@ -57,62 +57,80 @@ object ReflectionMacro {
         case (_, idx, true, _) => idx
         case (_, idx, _, true) => idx
       }.toSet
+      val returnsValueClass = {
+        def resultType(tpe: TypeRepr): TypeRepr =
+          tpe match {
+            case MethodType(_, _, rt) => resultType(rt)
+            case PolyType(_, _, rt)   => resultType(rt)
+            case rt                   => rt
+          }
 
-      if byNameOrVarArgIndices.isEmpty then None
-      else {
-        val jvmParamTypes = params.map { case (pt, _, isByName, isVarArg) =>
-          if isByName then '{ classOf[scala.Function0[?]] }
-          else if isVarArg then {
-            if isJavaMethod then {
-              // Java varargs use array types at JVM level, not Seq
-              // Extract element type from the repeated type
-              val elemType = pt match {
-                case AnnotatedType(underlying, _) =>
-                  underlying match {
-                    case AppliedType(_, List(elem)) => elem
-                    case _                          => TypeRepr.of[Object]
-                  }
-                case AppliedType(_, List(elem)) => elem
-                case _                          => TypeRepr.of[Object]
-              }
-              // Use java.lang.reflect.Array to get the array class at runtime
-              val elemClassExpr = jvmClassExpr(elemType)
-              '{ java.lang.reflect.Array.newInstance($elemClassExpr, 0).getClass }
-            } else '{ classOf[scala.collection.immutable.Seq[?]] }
-          } else jvmClassExpr(pt)
+        val rt: TypeRepr = methodSym.tree match {
+          case dd: DefDef => dd.returnTpt.tpe
+          case _          => resultType(methodType)
         }
-        Some(MethodInfo(sym.name, jvmParamTypes, byNameOrVarArgIndices))
+        val normalized = rt.dealias.simplified
+        val returnSym  = normalized.typeSymbol
+        returnSym.isClassDef && returnSym != defn.AnyValClass && (normalized <:< TypeRepr.of[AnyVal])
       }
+
+      val jvmParamTypes = params.map { case (pt, _, isByName, isVarArg) =>
+        if isByName then '{ classOf[scala.Function0[?]] }
+        else if isVarArg then {
+          if isJavaMethod then {
+            // Java varargs use array types at JVM level, not Seq
+            // Extract element type from the repeated type
+            val elemType = pt match {
+              case AnnotatedType(underlying, _) =>
+                underlying match {
+                  case AppliedType(_, List(elem)) => elem
+                  case _                          => TypeRepr.of[Object]
+                }
+              case AppliedType(_, List(elem)) => elem
+              case _                          => TypeRepr.of[Object]
+            }
+            // Use java.lang.reflect.Array to get the array class at runtime
+            val elemClassExpr = jvmClassExpr(elemType)
+            '{ java.lang.reflect.Array.newInstance($elemClassExpr, 0).getClass }
+          } else '{ classOf[scala.collection.immutable.Seq[?]] }
+        } else jvmClassExpr(pt)
+      }
+      Some(MethodInfo(methodSym.name, jvmParamTypes, byNameOrVarArgIndices, returnsValueClass))
     }
 
     if methodInfos.isEmpty then '{ () }
     else {
-      val classExpr = Expr.summon[ClassTag[T]] match {
-        case Some(ct) => '{ $ct.runtimeClass }
-        case None     => '{ classOf[Any] }
-      }
+      val classExpr = '{ $classTagExpr.runtimeClass }
 
       val registrations = methodInfos.map { info =>
-        val nameExpr       = Expr(info.name)
-        val paramTypesExpr = Expr.ofList(info.jvmParamTypes)
-        val indicesExpr    = Expr(info.byNameOrVarArgIndices)
-        '{ ($nameExpr, $paramTypesExpr, $indicesExpr) }
+        val nameExpr              = Expr(info.name)
+        val paramTypesExpr        = Expr.ofList(info.jvmParamTypes)
+        val indicesExpr           = Expr(info.byNameOrVarArgIndices)
+        val returnsValueClassExpr = Expr(info.returnsValueClass)
+        '{ ($nameExpr, $paramTypesExpr, $indicesExpr, $returnsValueClassExpr) }
       }
       val registrationsExpr = Expr.ofList(registrations)
 
       '{
         val clazz = $classExpr
-        if clazz != classOf[Any] && !ByNameParamCache.get(clazz).isDefined then {
+        if clazz != classOf[Any] then {
           val infos       = $registrationsExpr
-          val methodInfos = infos.flatMap { case (name, paramTypes, indices) =>
+          val methodInfos = infos.flatMap { case (name, paramTypes, indices, returnsValueClass) =>
             try {
               val method = clazz.getMethod(name, paramTypes*)
-              Some((method, indices))
+              Some((method, indices, returnsValueClass))
             } catch {
               case _: NoSuchMethodException => None
             }
           }
-          if methodInfos.nonEmpty then ByNameParamCache.register(clazz, methodInfos)
+
+          val byNameInfos = methodInfos.collect { case (method, indices, _) if indices.nonEmpty => (method, indices) }
+          if byNameInfos.nonEmpty && !ByNameParamCache.get(clazz).isDefined then ByNameParamCache.register(clazz, byNameInfos)
+
+          if methodInfos.nonEmpty then
+            ByNameParamCache.registerReturnsValueClass(methodInfos.map { case (method, _, returnsValueClass) =>
+              (method, returnsValueClass)
+            })
         }
       }
     }

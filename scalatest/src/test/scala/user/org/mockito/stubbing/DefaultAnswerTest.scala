@@ -16,14 +16,16 @@ object DefaultAnswerTest {
 
     def baz(a: String = "default"): String = a
 
-    def valueClass: ValueClass = ValueClass(42)
+    def valueClass: ValueClass       = ValueClass(42)
+    def refValueClass: RefValueClass = RefValueClass(new Bar)
 
     def userClass(v: Int = 42): Bar = new Bar
 
     def returnsList: List[String] = List("not mocked!")
   }
 
-  case class ValueClass(v: Int) extends AnyVal
+  case class ValueClass(v: Int)    extends AnyVal
+  case class RefValueClass(v: Bar) extends AnyVal
 
   class Bar {
     def callMeMaybe(): Unit = ()
@@ -82,6 +84,17 @@ class DefaultAnswerTest extends AnyWordSpec with should.Matchers with IdiomaticM
 
     "work for value classes" in {
       aMock.valueClass.v shouldBe 0
+    }
+
+    "work for reference-backed value classes" in {
+      val smartNull: Bar = aMock.refValueClass.v
+
+      smartNull should not be null
+
+      val throwable = the[SmartNullPointerException] thrownBy
+        smartNull.callMeMaybe()
+
+      throwable.getMessage should include("You have a NullPointerException here:")
     }
   }
 }

@@ -40,7 +40,7 @@ private[mockito] trait MockCreator extends MockCreatorRuntime {
       mockSettings: MockSettings,
       mockHandler: (MockCreationSettings[T], Prettifier) => MockHandler[T]
   )(using $pt: Prettifier): T = {
-    ReflectionMacro.registerByNameAndVarArgInfo[T]()
+    ReflectionMacro.registerByNameAndVarArgInfo[T]
     createMock[T](mockSettings, ReflectionUtils.extraInterfaces[T], mockHandler)
   }
 }

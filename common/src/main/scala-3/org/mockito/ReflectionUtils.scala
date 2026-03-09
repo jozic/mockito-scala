@@ -3,9 +3,8 @@ package org.mockito
 import org.mockito.JavaReflectionUtils.resolveWithJavaGenerics
 import org.mockito.invocation.InvocationOnMock
 
-import java.lang.reflect.Method
+import java.lang.reflect.{ Method, TypeVariable }
 import scala.reflect.ClassTag
-import scala.util.Try as uTry
 
 object ReflectionUtils {
 
@@ -24,16 +23,21 @@ object ReflectionUtils {
   /**
    * Check if a method returns a value class (extends AnyVal)
    *
-   * Scala 3 note: Without runtime Scala reflection, we check if the return type extends AnyVal using Java reflection
+   * Scala 3 note: Prefer compile-time metadata cached by ReflectionMacro (registered at mock creation time), then fall back to JVM reflection + generic return-type handling.
    */
-  private[mockito] def returnsValueClass(invocation: InvocationOnMock): Boolean = {
-    val returnType = invocation.method.getReturnType
-    // Check if it's a known value class type or extends AnyVal
-    // This is a conservative check - may miss some value classes
-    uTry {
-      classOf[AnyVal].isAssignableFrom(returnType)
-    }.getOrElse(false)
-  }
+  private[mockito] def returnsValueClass(invocation: InvocationOnMock): Boolean =
+    val method     = invocation.method
+    val returnType = method.getReturnType
+    if returnType.isPrimitive then true
+    else
+      org.mockito.internal.handler.ByNameParamCache
+        .getReturnsValueClass(method)
+        .getOrElse {
+          method.getGenericReturnType match {
+            case _: TypeVariable[?] => false
+            case _                  => classOf[AnyVal].isAssignableFrom(returnType)
+          }
+        }
 
   /**
    * Extract extra interfaces from a refined type (e.g., `mock[Foo with Bar]` extracts `Bar` as extra interface).
