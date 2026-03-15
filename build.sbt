@@ -21,7 +21,7 @@ lazy val commonSettings =
   Seq(
     organization := "org.mockito",
     // Load version from the file so that Gradle/Shipkit and SBT use the same version
-    crossScalaVersions := Seq(currentScalaVersion, "2.12.21"),
+    crossScalaVersions := Seq(currentScalaVersion, "2.12.21", scala3Version),
     scalafmtOnCompile  := true,
     scalacOptions ++= {
       val common = Seq(
@@ -165,7 +165,6 @@ lazy val common = (project in file("common"))
   .settings(
     commonSettings,
     noPublishingSettings,
-    crossScalaVersions += scala3Version,
     libraryDependencies ++= Dependencies.commonLibraries ++
       Dependencies.scalaReflection.value ++ Seq(
         Dependencies.catsLaws   % "test",
@@ -201,7 +200,6 @@ lazy val macroSub = (project in file("macro"))
   .dependsOn(common)
   .settings(
     commonSettings,
-    crossScalaVersions += scala3Version,
     noPublishingSettings,
     libraryDependencies ++= Dependencies.commonLibraries,
     libraryDependencies ++= Dependencies.scalaReflection.value,
@@ -215,9 +213,6 @@ lazy val macroCommon = (project in file("macro-common"))
   .settings(
     commonSettings,
     noPublishingSettings,
-    // TODO: Scala 3 is being enabled module-by-module. Once all modules have scala-3/ sources,
-    //  move scala3Version to the global crossScalaVersions in commonSettings and remove per-module overrides.
-    crossScalaVersions += scala3Version,
     libraryDependencies ++= Dependencies.scalaReflection.value,
     libraryDependencies += Dependencies.scalatest % Test,
     publish         := {},
